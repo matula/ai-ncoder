@@ -1,0 +1,116 @@
+name: Build macOS App
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/pip
+          key: pip-macos-arm64-py3.12-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            pip-macos-arm64-py3.12-
+
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Cache external assets
+        id: cache-assets
+        uses: actions/cache@v4
+        with:
+          path: |
+            models/qwen2.5-coder-0.5b-instruct-q8_0.gguf
+            bin/ffmpeg
+            bin/ffprobe
+          key: assets-model-qwen2.5-0.5b-q8-ffmpeg-arm64-v1
+
+      - name: Download AI model
+        if: steps.cache-assets.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p models
+          curl -L -o models/qwen2.5-coder-0.5b-instruct-q8_0.gguf \
+            "https://huggingface.co/Qwen/Qwen2.5-Coder-0.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-0.5b-instruct-q8_0.gguf"
+
+      - name: Download ffmpeg and ffprobe
+        if: steps.cache-assets.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p bin
+          curl -L -o /tmp/ffmpeg.zip \
+            "https://ffmpeg.martin-riedl.de/redirect/latest/macos/arm64/release/ffmpeg.zip"
+          curl -L -o /tmp/ffprobe.zip \
+            "https://ffmpeg.martin-riedl.de/redirect/latest/macos/arm64/release/ffprobe.zip"
+          unzip -o /tmp/ffmpeg.zip -d bin/
+          unzip -o /tmp/ffprobe.zip -d bin/
+          chmod +x bin/ffmpeg bin/ffprobe
+
+      - name: Verify assets
+        run: |
+          echo "=== Model ==="
+          ls -lh models/qwen2.5-coder-0.5b-instruct-q8_0.gguf
+          echo "=== ffmpeg ==="
+          file bin/ffmpeg
+          bin/ffmpeg -version | head -1
+          echo "=== ffprobe ==="
+          file bin/ffprobe
+          bin/ffprobe -version | head -1
+
+      - name: Inject version into spec file
+        run: |
+          sed -i '' "s/\"CFBundleShortVersionString\": \"1.0.0\"/\"CFBundleShortVersionString\": \"${{ steps.version.outputs.VERSION }}\"/" AI-ncoder.spec
+
+      - name: Build .app bundle with PyInstaller
+        run: pyinstaller AI-ncoder.spec --noconfirm
+
+      - name: Verify build output
+        run: |
+          echo "=== App bundle ==="
+          ls -la dist/AI-ncoder.app/
+          echo "=== Bundle size ==="
+          du -sh dist/AI-ncoder.app/
+          echo "=== Binary architecture ==="
+          file dist/AI-ncoder.app/Contents/MacOS/AI-ncoder
+
+      - name: Ad-hoc code sign
+        run: codesign --force --deep --sign - dist/AI-ncoder.app
+
+      - name: Create release archive
+        run: |
+          cd dist
+          zip -r -y AI-ncoder-${{ steps.version.outputs.VERSION }}-macos-arm64.zip AI-ncoder.app
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AI-ncoder-${{ steps.version.outputs.VERSION }}-macos-arm64
+          path: dist/AI-ncoder-${{ steps.version.outputs.VERSION }}-macos-arm64.zip
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: AI-ncoder ${{ steps.version.outputs.VERSION }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: dist/AI-ncoder-${{ steps.version.outputs.VERSION }}-macos-arm64.zip

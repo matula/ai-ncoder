@@ -20,15 +20,15 @@ jobs:
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.14'
 
       - name: Cache pip packages
         uses: actions/cache@v4
         with:
           path: ~/Library/Caches/pip
-          key: pip-macos-arm64-py3.12-${{ hashFiles('requirements.txt') }}
+          key: pip-macos-arm64-py3.14-${{ hashFiles('requirements.txt') }}
           restore-keys: |
-            pip-macos-arm64-py3.12-
+            pip-macos-arm64-py3.14-
 
       - name: Install Python dependencies
         run: |

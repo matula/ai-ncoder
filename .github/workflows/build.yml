@@ -33,7 +33,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           pip install --upgrade pip
-          pip install -r requirements.txt
+          CMAKE_ARGS="-DGGML_NATIVE=OFF" pip install -r requirements.txt
           pip install pyinstaller
 
       - name: Cache external assets

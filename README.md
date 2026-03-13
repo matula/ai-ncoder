@@ -2,8 +2,7 @@
 
 A desktop app that converts media files using plain English. Powered by a local SLM (Small Language Model) - runs entirely offline, no API keys or internet required.
 
-<!-- TODO: Add a screenshot here -->
-<!-- ![AI-ncoder screenshot](screenshot.png) -->
+![AI-ncoder screenshot](screenshot1.jpg)
 
 ## Features
 
@@ -115,7 +114,7 @@ xattr -cr dist/AI-ncoder.app
 
 ### Windows
 
-The current `AI-ncoder.spec` is configured for macOS. To build on Windows:
+The current `AI-ncoder.spec` is configured for macOS. To build on Windows (this is theoretical, since I've not actually done it):
 
 1. Use `ffmpeg.exe` and `ffprobe.exe` in `bin/`
 2. In `AI-ncoder.spec`:
